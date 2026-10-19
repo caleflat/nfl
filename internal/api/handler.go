@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/caleflat/nfl/internal/plays"
 	"github.com/caleflat/nfl/internal/summary"
 )
 
@@ -17,16 +18,20 @@ type SummaryStore interface {
 	Summary(context.Context, summary.Filters) (summary.Result, error)
 }
 
-func NewHandler(store SummaryStore, logger *slog.Logger, queryTimeout time.Duration) http.Handler {
+type PlayStore interface {
+	Plays(context.Context, plays.Request) (plays.Result, error)
+}
+
+func NewHandler(store SummaryStore, matches PlayStore, logger *slog.Logger, queryTimeout time.Duration) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		status := serve(w, r, store, logger, queryTimeout)
+		status := serve(w, r, store, matches, logger, queryTimeout)
 		logger.Info("request", "method", r.Method, "path", r.URL.Path, "status", status, "duration", time.Since(start))
 	})
 }
 
-func serve(w http.ResponseWriter, r *http.Request, store SummaryStore, logger *slog.Logger, queryTimeout time.Duration) int {
-	if r.URL.Path != "/api/v1/summary" && r.URL.Path != "/healthz" {
+func serve(w http.ResponseWriter, r *http.Request, store SummaryStore, matches PlayStore, logger *slog.Logger, queryTimeout time.Duration) int {
+	if r.URL.Path != "/api/v1/summary" && r.URL.Path != "/api/v1/plays" && r.URL.Path != "/healthz" {
 		return failure(w, http.StatusNotFound, "not_found", "route not found")
 	}
 	if r.Method != http.MethodGet {
@@ -36,13 +41,27 @@ func serve(w http.ResponseWriter, r *http.Request, store SummaryStore, logger *s
 	if r.URL.Path == "/healthz" {
 		return respond(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
-	filters, err := parseFilters(r.URL.RawQuery)
-	if err != nil {
-		return failure(w, http.StatusBadRequest, "invalid_filters", err.Error())
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
 	defer cancel()
-	result, err := store.Summary(ctx, filters)
+	var result any
+	var err error
+	if r.URL.Path == "/api/v1/plays" {
+		var req plays.Request
+		req, err = parsePlayRequest(r.URL.RawQuery)
+		if err == nil {
+			result, err = matches.Plays(ctx, req)
+		} else {
+			return failure(w, http.StatusBadRequest, "invalid_filters", err.Error())
+		}
+	} else {
+		var filters summary.Filters
+		filters, err = parseFilters(r.URL.RawQuery)
+		if err == nil {
+			result, err = store.Summary(ctx, filters)
+		} else {
+			return failure(w, http.StatusBadRequest, "invalid_filters", err.Error())
+		}
+	}
 	if err == nil {
 		return respond(w, http.StatusOK, result)
 	}
@@ -52,36 +71,56 @@ func serve(w http.ResponseWriter, r *http.Request, store SummaryStore, logger *s
 	}
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded), errors.Is(err, context.DeadlineExceeded):
-		return failure(w, http.StatusGatewayTimeout, "query_timeout", "summary query timed out")
+		return failure(w, http.StatusGatewayTimeout, "query_timeout", "query timed out")
+	case errors.Is(err, plays.ErrDatasetChanged):
+		return failure(w, http.StatusConflict, "dataset_changed", err.Error())
 	case errors.Is(err, summary.ErrUnknownTeam):
 		return failure(w, http.StatusBadRequest, "unknown_team", err.Error())
 	case errors.Is(err, summary.ErrSeasonUnavailable):
 		return failure(w, http.StatusNotFound, "season_unavailable", err.Error())
 	default:
-		logger.Error("summary query failed", "error", err)
-		return failure(w, http.StatusInternalServerError, "internal_error", "could not load summary")
+		logger.Error("query failed", "error", err)
+		return failure(w, http.StatusInternalServerError, "internal_error", "could not load results")
 	}
 }
 
 func parseFilters(raw string) (summary.Filters, error) {
-	f := summary.Filters{MinDistance: 0, MaxDistance: 100}
+	q, err := parseQuery(raw)
+	if err != nil {
+		return summary.Filters{}, err
+	}
+	return filtersFromQuery(q)
+}
+
+func parseQuery(raw string, extra ...string) (url.Values, error) {
 	if len(raw) > 2048 {
-		return f, errors.New("query string is too long")
+		return nil, errors.New("query string is too long")
 	}
 	q, err := url.ParseQuery(raw)
 	if err != nil {
-		return f, errors.New("malformed query string")
+		return nil, errors.New("malformed query string")
 	}
 	for key, values := range q {
 		switch key {
 		case "season", "team", "down", "min_distance", "max_distance":
 		default:
-			return f, errors.New("unknown query parameter: " + key)
+			allowed := false
+			for _, name := range extra {
+				allowed = allowed || key == name
+			}
+			if !allowed {
+				return nil, errors.New("unknown query parameter: " + key)
+			}
 		}
 		if len(values) != 1 || values[0] == "" {
-			return f, errors.New("query parameters must have one nonempty value: " + key)
+			return nil, errors.New("query parameters must have one nonempty value: " + key)
 		}
 	}
+	return q, nil
+}
+
+func filtersFromQuery(q url.Values) (summary.Filters, error) {
+	f := summary.Filters{MinDistance: 0, MaxDistance: 100}
 	f.Team = q.Get("team")
 	for _, param := range []struct {
 		name     string
@@ -102,6 +141,32 @@ func parseFilters(raw string) (summary.Filters, error) {
 		*param.target = value
 	}
 	return f, f.Validate()
+}
+
+func parsePlayRequest(raw string) (plays.Request, error) {
+	req := plays.Request{Limit: 25}
+	q, err := parseQuery(raw, "limit", "offset", "source_sha256")
+	if err != nil {
+		return req, err
+	}
+	req.Filters, err = filtersFromQuery(q)
+	if err != nil {
+		return req, err
+	}
+	for _, param := range []struct {
+		name  string
+		value *int
+	}{{"limit", &req.Limit}, {"offset", &req.Offset}} {
+		if raw := q.Get(param.name); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil {
+				return req, errors.New(param.name + " must be an integer")
+			}
+			*param.value = n
+		}
+	}
+	req.SourceSHA256 = q.Get("source_sha256")
+	return req, req.Validate()
 }
 
 func failure(w http.ResponseWriter, status int, code, message string) int {

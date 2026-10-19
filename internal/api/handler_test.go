@@ -37,7 +37,7 @@ func TestInvalidRequestsDoNotQueryDatabase(t *testing.T) {
 	} {
 		t.Run(query, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			NewHandler(store, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?"+query, nil))
+			NewHandler(store, nil, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?"+query, nil))
 			if w.Code != 400 || w.Header().Get("Content-Type") != "application/json" {
 				t.Fatalf("invalid filters: %d %s", w.Code, w.Body.String())
 			}
@@ -56,7 +56,7 @@ func TestSummaryDefaultsAndNullJSON(t *testing.T) {
 		return summary.Result{Filters: f}, nil
 	})
 	w := httptest.NewRecorder()
-	NewHandler(store, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?season=2025&team=NE&down=1", nil))
+	NewHandler(store, nil, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?season=2025&team=NE&down=1", nil))
 	if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("success response: %d %s", w.Code, w.Body.String())
 	}
@@ -85,7 +85,7 @@ func TestErrorMappingAndRoutes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := storeFunc(func(context.Context, summary.Filters) (summary.Result, error) { return summary.Result{}, tc.storeError })
 			w := httptest.NewRecorder()
-			NewHandler(store, logger(), time.Second).ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
+			NewHandler(store, nil, logger(), time.Second).ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
 			if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.code) || strings.Contains(w.Body.String(), "private database") {
 				t.Fatalf("error mapping: %d %s", w.Code, w.Body.String())
 			}
@@ -101,7 +101,7 @@ func TestDeadlineAndClientCancellationReachStore(t *testing.T) {
 		<-ctx.Done()
 		return summary.Result{}, ctx.Err()
 	})
-	handler := NewHandler(store, logger(), 10*time.Millisecond)
+	handler := NewHandler(store, nil, logger(), 10*time.Millisecond)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?season=2025&team=NE&down=3", nil))
 	if w.Code != 504 || !strings.Contains(w.Body.String(), "query_timeout") {
@@ -123,7 +123,7 @@ func TestHealthDoesNotQueryDatabase(t *testing.T) {
 		return summary.Result{}, nil
 	})
 	w := httptest.NewRecorder()
-	NewHandler(store, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/healthz", nil))
+	NewHandler(store, nil, logger(), time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/healthz", nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health: %d %s", w.Code, w.Body.String())
 	}

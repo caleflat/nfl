@@ -150,7 +150,7 @@ func TestSummaryBoundariesEmptyAndMissing(t *testing.T) {
 
 func TestHTTPWithRealPostgresAndCancellation(t *testing.T) {
 	db := seededDB(t)
-	handler := api.NewHandler(summary.Store{DB: db}, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second)
+	handler := api.NewHandler(summary.Store{DB: db}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?season=2025&team=NE&down=3&min_distance=5&max_distance=10", nil))
 	var r summary.Result
@@ -168,7 +168,7 @@ func TestHTTPWithRealPostgresAndCancellation(t *testing.T) {
 	if _, err := tx.Exec(`LOCK TABLE plays IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
-	handler = api.NewHandler(summary.Store{DB: db}, slog.New(slog.NewTextHandler(io.Discard, nil)), 100*time.Millisecond)
+	handler = api.NewHandler(summary.Store{DB: db}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), 100*time.Millisecond)
 	w = httptest.NewRecorder()
 	start := time.Now()
 	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/summary?season=2025&team=NE&down=3", nil))
