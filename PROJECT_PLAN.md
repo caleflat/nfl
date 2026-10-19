@@ -1,6 +1,6 @@
 # NFL Situational Play Explorer
 
-Status: source inspection and the initial data contract are merged. PostgreSQL migrations and atomic local-file imports are implemented on a feature branch for review; see [import design](docs/IMPORTING.md). API, aggregate metric queries, and frontend are not implemented yet.
+Status: source inspection, the initial data contract, PostgreSQL migrations, and atomic local-file imports are merged. Verified summary metrics and their first HTTP endpoint are implemented on a feature branch for review; see [API documentation](docs/API.md). Matching-play pagination, comparison, and frontend remain future work.
 
 ## Purpose
 
@@ -26,7 +26,7 @@ The interface will show sample sizes alongside results and explain which records
 | Database access | Explicit SQL through `database/sql` and pgx's compatibility driver | Keep queries visible and explainable |
 | Schema changes | Embedded, numbered SQL migrations with checksums and a transactional runner | Reproducible database setup and evolution |
 | Frontend | React, TypeScript, Vite | A focused interactive client for the Go API |
-| Local database | Docker Compose | Reproducible local PostgreSQL setup |
+| Local services | Docker Compose | Start PostgreSQL, apply migrations, and run the API together; run imports explicitly |
 | CI | GitHub Actions | Run meaningful tests and build checks |
 
 Use one repository, one database, and one API process. Provide separate `import` and `serve` commands, sharing code where appropriate. The exact command syntax and package layout remain implementation decisions.

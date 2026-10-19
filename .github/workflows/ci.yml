@@ -36,3 +36,16 @@ jobs:
       - run: go test -race ./...
       - run: go vet ./...
       - run: go build ./...
+      - name: Verify Compose startup
+        run: |
+          docker compose up -d --build --wait
+          curl --fail-with-body http://127.0.0.1:8080/healthz
+          status=$(curl -sS -o /tmp/summary-response.json -w '%{http_code}' 'http://127.0.0.1:8080/api/v1/summary?season=2025&team=NE&down=3')
+          test "$status" = 404
+          jq -e '.error.code == "season_unavailable"' /tmp/summary-response.json
+      - name: Compose logs
+        if: failure()
+        run: docker compose logs
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down

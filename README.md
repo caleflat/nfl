@@ -2,7 +2,7 @@
 
 A Go/PostgreSQL project for exploring how NFL offenses perform in selected game situations. The backend is the primary focus; a small React interface is planned.
 
-**Current state:** source inspection, PostgreSQL schema/migrations, and a local CSV importer. There is no API or frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), and [database/import design](docs/IMPORTING.md).
+**Current state:** source inspection, PostgreSQL schema/migrations, a local CSV importer, and the first situational summary endpoint. There is no frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), [database/import design](docs/IMPORTING.md), and [API documentation](docs/API.md).
 
 ## Run the source inspection
 
@@ -27,35 +27,66 @@ The inspection command streams the CSV and outputs JSON containing its SHA-256, 
 - Review and merge each milestone before starting work that depends on it.
 - Do not commit downloaded datasets, local configuration secrets, or generated binaries.
 
-The first PR established source findings and metric rules. The second adds database setup and atomic imports. API and aggregate calculations follow separately.
+The first PR established source findings and metric rules. The second added database setup and atomic imports. The third adds verified summary calculations and their first HTTP endpoint. Play listings, team comparison, and frontend work follow separately.
 
-## Start PostgreSQL and import a season
+## Run with Docker Compose
 
-Prerequisites: Go 1.26+, Docker with Compose, and the CSV downloaded above. The importer reads a local file; it does not download data. Local credentials are development defaults, and PostgreSQL is bound to loopback on port 5433.
+Prerequisites: a running Docker engine (e.g. OrbStack or Docker Desktop), Docker Compose, and `curl` to download data. Host Go and exported environment variables are not required for this workflow. Run commands from the repository root.
 
 ```sh
-cp .env.example .env
-set -a
-. ./.env
-set +a
-docker compose up -d --wait
+docker compose up -d --build --wait
+```
+
+Compose starts PostgreSQL, waits for it to be healthy, runs migrations, then starts the API. The API is exposed on loopback port 8080 and PostgreSQL on loopback port 5433. Containers use an internal database URL automatically. Credentials are local development defaults. Existing data persists in the named database volume.
+
+On a fresh setup, download and import a season explicitly:
+
+```sh
+mkdir -p data/raw
+curl -fL --retry 2 -o data/raw/play_by_play_2025.csv \
+  https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv
+docker compose run --rm importer -season 2025 -file /data/play_by_play_2025.csv \
+  -source https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv
+curl -sS 'http://127.0.0.1:8080/api/v1/summary?season=2025&team=NE&down=3&min_distance=5&max_distance=10'
+```
+
+The importer mounts `data/raw` read-only as `/data`; downloads are not baked into images. It runs only when explicitly requested. Reimporting replaces the season, including corrections and removed plays. Only regular-season records are published. Failure preserves existing data and provenance. Success produces JSON; errors and elapsed time go to stderr. `-timeout` defaults to five minutes and includes lock wait.
+
+Pass `-source-obtained-at` with the actual RFC3339 acquisition time if known; otherwise file modification time is used as a proxy. An unimported season returns 404 even when services are healthy. The root URL `/` has no frontend yet.
+
+Useful commands:
+
+```sh
+docker compose ps -a
+docker compose logs -f api
+docker compose logs migrate
+docker compose exec -T db psql -U nfl -d nfl -c \
+  'SELECT season, source_rows, stored_rows, eligible_rows, source_sha256 FROM season_imports;'
+docker compose stop
+```
+
+The migration container exits successfully; it is not a long-running service. Stopping retains data. Rebuild after source changes with `docker compose up -d --build --wait`. Optionally copy `.env.example` to `.env` to edit `API_PORT` / `POSTGRES_PORT`. No file or variable export is needed for default ports. Container `DATABASE_URL` is explicitly set in Compose; the example's localhost URL is for host Go development.
+
+## Host Go development
+
+For a faster edit/run loop, use Go 1.26+ on the host and PostgreSQL in Docker. Stop the container API first to free port 8080:
+
+```sh
+docker compose stop api
+docker compose up -d --wait db
+export DATABASE_URL='postgres://nfl:local_nfl@localhost:5433/nfl?sslmode=disable'
 go run ./cmd/migrate
+go run ./cmd/serve
+```
+
+If changing `POSTGRES_PORT`, adjust the host URL to match. Go commands do not load `.env` automatically. The equivalent host import is:
+
+```sh
 go run ./cmd/import -season 2025 -file data/raw/play_by_play_2025.csv \
   -source https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv
 ```
 
-Rerun the import to replace the season, including corrections and removed plays. Only regular-season records are published. Import failure preserves existing data and provenance. The command prints a JSON publication summary on success; errors and elapsed time go to stderr. `-timeout` defaults to five minutes and includes waiting for another import. Ctrl-C cancels the database transaction.
-
-Pass `-source-obtained-at 2026-10-19T12:00:00Z` with the actual acquisition time if known. Otherwise, the source acquisition timestamp defaults to the file modification time, which is only a proxy. `.env` is loaded by the shell commands above, not automatically by the Go programs. If changing `POSTGRES_PORT`, update `DATABASE_URL` to match.
-
-Check the publication:
-
-```sh
-docker compose exec -T db psql -U nfl -d nfl -c \
-  'SELECT season, source_rows, stored_rows, eligible_rows, source_sha256 FROM season_imports;'
-```
-
-Stop the database with `docker compose stop`; its named volume retains the data.
+Results include play count, yards/play, EPA, success rate, aDOT, CPOE, classified-attempt conversion rate, metric-specific coverage, and source provenance. See [API documentation](docs/API.md) for response semantics, configuration, and error behavior.
 
 ## Tests
 
