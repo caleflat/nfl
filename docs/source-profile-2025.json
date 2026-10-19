@@ -1,0 +1,83 @@
+{
+  "sha256": "8ce0001826f0f7b895b7a1068e4db7f43696c699db7064ccb1201855768fd06c",
+  "rows": 48771,
+  "columns": 372,
+  "games": 285,
+  "duplicate_game_play_ids": 0,
+  "seasons": {
+    "2025": 48771
+  },
+  "season_types": {
+    "POST": 2319,
+    "REG": 46452
+  },
+  "play_types": {
+    "": 1445,
+    "extra_point": 1330,
+    "field_goal": 1140,
+    "kickoff": 2927,
+    "no_play": 4723,
+    "pass": 19737,
+    "punt": 2042,
+    "qb_kneel": 452,
+    "qb_spike": 80,
+    "run": 14895
+  },
+  "regular_season_offense": {
+    "plays": 32726,
+    "games": 272,
+    "teams": {
+      "ARI": 1068,
+      "ATL": 1030,
+      "BAL": 952,
+      "BUF": 1052,
+      "CAR": 987,
+      "CHI": 1082,
+      "CIN": 1044,
+      "CLE": 1023,
+      "DAL": 1097,
+      "DEN": 1073,
+      "DET": 1046,
+      "GB": 987,
+      "HOU": 1069,
+      "IND": 999,
+      "JAX": 1069,
+      "KC": 1045,
+      "LA": 1053,
+      "LAC": 1077,
+      "LV": 937,
+      "MIA": 932,
+      "MIN": 934,
+      "NE": 1011,
+      "NO": 1060,
+      "NYG": 1074,
+      "NYJ": 996,
+      "PHI": 990,
+      "PIT": 972,
+      "SEA": 989,
+      "SF": 1060,
+      "TB": 1055,
+      "TEN": 994,
+      "WAS": 969
+    },
+    "missing": {
+      "air_yards": 15368,
+      "cpoe": 16117,
+      "epa": 0,
+      "yards_gained": 0
+    },
+    "targeted_attempts": 16609,
+    "target_missing_air_yards": 0,
+    "target_missing_cpoe": 1,
+    "third_down": {
+      "converted": 2709,
+      "failed": 4066,
+      "unclassified": 8
+    },
+    "fourth_down": {
+      "converted": 488,
+      "failed": 385,
+      "unclassified": 0
+    }
+  }
+}
