@@ -1,6 +1,6 @@
-# Situational summary API
+# Situational analysis API
 
-Status: first endpoint, prepared for review. The matching-play list, team comparison, and metadata discovery endpoints are later milestones. Run migrations and import a season before querying it.
+Status: summary endpoint and Docker workflow are merged. The matching-play endpoint is implemented for review. Team comparison and metadata discovery remain later milestones. Run migrations and import a season before querying it.
 
 ## Run with Docker Compose
 
@@ -53,6 +53,34 @@ When a metric has no valid observations, its mean/rate and sum/total are JSON nu
 
 For aDOT, retain negative and zero air yards and include identified incomplete/intercepted targets. The identified-target restriction can omit real targets with missing receiver attribution. For conversions, exactly one corresponding source flag must be true; both false, null flags, and conflicting flags are unclassified rather than failures. The API does not infer conversion from yards gained.
 
+## GET /api/v1/plays
+
+Uses the same required `season`, `team`, and `down` filters and inclusive optional distance bounds as the summary. Additional parameters:
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `limit` | 25 | Page size, 1–100 |
+| `offset` | 0 | Number of matching plays to skip, 0–100000 |
+| `source_sha256` | Omitted | Optional expected dataset hash, 64 lowercase hexadecimal characters |
+
+```sh
+curl -sS 'http://127.0.0.1:8080/api/v1/plays?season=2025&team=NE&down=3&min_distance=5&max_distance=10&limit=25&offset=0'
+```
+
+The response contains effective `filters`, `dataset` provenance, `pagination` (`limit`, `offset`, total matching plays, nullable `next_offset`), and a `plays` array. Use `next_offset` for subsequent pages while preserving filters and the expected hash. Order is ascending `game_id`, then numeric `play_id`. The compound key makes ordering deterministic. There is no configurable sort or cursor. Bounded offset pagination fits the current single-team, single-down season samples; this is not a bulk export API.
+
+Records include game/play identifiers; week, date, home/away/offensive/defensive teams; quarter/clock, down/distance, field position, score differential, description, and play type; raw yardage, EPA, air yards, and CPOE; `identified_target`; sack/scramble/penalty/completion/interception/touchdown flags; and `conversion_status`. Optional values remain JSON null. Dates use `YYYY-MM-DD`. Conversion status is `converted`, `failed`, `unclassified`, or `not_applicable` under the summary rules. Raw air yards/CPOE on non-target plays do not contribute to summary passing metrics; use `identified_target` to interpret them.
+
+Empty samples return `plays: []`, total 0, and no next offset. Beyond-end offsets return an empty array with the actual matching total. The total equals the summary play count for the same filters and dataset; individual metric counts may be smaller.
+
+### Consistency across pages and summaries
+
+Metadata, count, and page use one read-only repeatable-read PostgreSQL transaction, so a concurrent reimport cannot mix publications within a response.
+
+Pass the summary's `dataset.source_sha256` with the first and every subsequent play request to browse that source snapshot. If the current hash differs, HTTP 409 `dataset_changed` instructs the client to refresh the summary and restart pagination. Old publications are not retained. Reimporting identical bytes changes publication time but not the hash and does not invalidate paging. Without the optional hash, pages can change between requests even though each response is internally consistent.
+
+The hash binds the source, not the filters: clients must preserve filters while paging. This API uses contract version 1; retain/check the returned contract version too. Contract changes require a separate compatibility decision.
+
 ## Errors and methods
 
 Errors use this shape:
@@ -68,6 +96,7 @@ Errors use this shape:
 | 404 | `season_unavailable` | No committed import for the requested season |
 | 404 | `not_found` | Unknown route |
 | 405 | `method_not_allowed` | Only GET is supported; response includes `Allow: GET` |
+| 409 | `dataset_changed` | Expected play dataset hash differs; restart with a fresh summary |
 | 504 | `query_timeout` | Database request exceeded its deadline |
 | 500 | `internal_error` | Unexpected database failure; details remain in server logs |
 
@@ -79,6 +108,6 @@ Returns `{"status":"ok"}` while the HTTP handler is running. This is process liv
 
 ## Validation and current limits
 
-Hand-calculated PostgreSQL fixtures cover metric denominators, null versus zero, negative air yards, target eligibility, positive-EPA success, conversion conflicts, inclusive distance bounds, and filter isolation. An end-to-end handler test uses PostgreSQL, blocks a query with a table lock, and verifies HTTP timeout, SQL cancellation, and subsequent pool usability. Unit tests cover request validation, errors, and context propagation. Existing import tests use the same isolated-schema helper.
+Hand-calculated PostgreSQL fixtures cover denominators, null versus zero, target eligibility, conversion rules, distance bounds, and filter isolation. Play tests walk pages without gaps/duplicates, compare their total with the summary, verify numeric key order and context/nulls, and reject stale hashes. Both endpoints test blocked real SQL queries, timeout/cancellation, and pool recovery. Unit tests cover validation, pagination bounds, errors, and context propagation. Import tests use the same isolated-schema helper.
 
-This release does not add query indexes, caching, pagination, play listings, or cross-team comparisons. Performance claims require a later measured workload. The endpoint exposes the first usable backend slice; matching-play inspection and comparison will build on it after review.
+This milestone adds play inspection and bounded pagination, without query indexes, caching, team comparison, or frontend. Performance claims require a later measured workload.
