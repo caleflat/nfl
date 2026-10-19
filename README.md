@@ -2,7 +2,7 @@
 
 A Go/PostgreSQL project for exploring how NFL offenses perform in selected game situations. The backend is the primary focus; a small React interface is planned.
 
-**Current state:** source inspection, PostgreSQL schema/migrations, a local CSV importer, and the first situational summary endpoint. There is no frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), [database/import design](docs/IMPORTING.md), and [API documentation](docs/API.md).
+**Current state:** source inspection, PostgreSQL schema/migrations, a local CSV importer, summary metrics, and paginated matching plays. There is no frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), [database/import design](docs/IMPORTING.md), and [API documentation](docs/API.md).
 
 ## Run the source inspection
 
@@ -27,7 +27,7 @@ The inspection command streams the CSV and outputs JSON containing its SHA-256, 
 - Review and merge each milestone before starting work that depends on it.
 - Do not commit downloaded datasets, local configuration secrets, or generated binaries.
 
-The first PR established source findings and metric rules. The second added database setup and atomic imports. The third adds verified summary calculations and their first HTTP endpoint. Play listings, team comparison, and frontend work follow separately.
+The first PR established source findings and metric rules. The second added database setup and atomic imports. The third adds verified summary calculations and their first HTTP endpoint. The fourth adds matching-play inspection and pagination. Team comparison and frontend work remain upcoming. See the progress checklist in PROJECT_PLAN.md for merge status.
 
 ## Run with Docker Compose
 

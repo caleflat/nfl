@@ -14,6 +14,7 @@ import (
 
 	"github.com/caleflat/nfl/internal/api"
 	"github.com/caleflat/nfl/internal/database"
+	"github.com/caleflat/nfl/internal/plays"
 	"github.com/caleflat/nfl/internal/summary"
 )
 
@@ -40,7 +41,7 @@ func run(ctx context.Context, logger *slog.Logger, addr string, queryTimeout tim
 	}
 	defer db.Close()
 	server := &http.Server{
-		Addr: addr, Handler: api.NewHandler(summary.Store{DB: db}, logger, queryTimeout),
+		Addr: addr, Handler: api.NewHandler(summary.Store{DB: db}, plays.Store{DB: db}, logger, queryTimeout),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 16 << 10,

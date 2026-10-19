@@ -1,6 +1,25 @@
 # NFL Situational Play Explorer
 
-Status: source inspection, the initial data contract, PostgreSQL migrations, and atomic local-file imports are merged. Verified summary metrics and their first HTTP endpoint are implemented on a feature branch for review; see [API documentation](docs/API.md). Matching-play pagination, comparison, and frontend remain future work.
+Status: source inspection, the data contract, PostgreSQL migrations/imports, verified summary metrics, the first HTTP endpoint, and the Docker development workflow are merged. Matching-play pagination is implemented and awaiting PR review. See [API documentation](docs/API.md) for implemented behavior.
+
+## Progress
+
+Update this checklist in each implementation PR. Mark milestones complete after merge; describe unmerged work as implemented and awaiting review.
+
+- [x] Source inspection, Go profiler, and initial data contract — [PR #1](https://github.com/caleflat/nfl/pull/1).
+- [x] PostgreSQL schema, migrations, atomic season replacement, and import tests — [PR #2](https://github.com/caleflat/nfl/pull/2).
+- [x] Verified summary metrics, HTTP validation/timeouts, and Docker startup — [PR #3](https://github.com/caleflat/nfl/pull/3).
+- [ ] Paginated matching plays with shared filters, metric/context fields, and reimport detection — implemented, awaiting review.
+- [ ] Team comparison under identical filters and a consistent dataset snapshot.
+- [ ] Available-season/team discovery for interface controls.
+- [ ] React interface with filters, summary, matching plays, comparisons, and shareable URLs.
+- [ ] Verify additional completed seasons and document compatibility.
+- [ ] Measure representative queries and document justified optimizations.
+- [ ] Portfolio packaging: screenshots, deployment decision, and evidence-based resume bullets.
+
+Current local coverage is the 2025 regular season. Go CI includes PostgreSQL integration tests and a fresh-database Docker startup check. Frontend checks and browser verification will be added with frontend work.
+
+The sections below describe release requirements and rationale; the checklist above is the current completion status.
 
 ## Purpose
 
@@ -29,7 +48,7 @@ The interface will show sample sizes alongside results and explain which records
 | Local services | Docker Compose | Start PostgreSQL, apply migrations, and run the API together; run imports explicitly |
 | CI | GitHub Actions | Run meaningful tests and build checks |
 
-Use one repository, one database, and one API process. Provide separate `import` and `serve` commands, sharing code where appropriate. The exact command syntax and package layout remain implementation decisions.
+Use one repository, one database, and one API process. Provide separate `import` and `serve` commands, sharing code where appropriate. Implemented commands are `inspect`, `migrate`, `import`, and `serve`; the README documents their host and Docker workflows.
 
 ```text
 nflverse season files -> Go import command -> PostgreSQL
@@ -80,15 +99,15 @@ Use published nflverse play-by-play season files directly. CSV allows ingestion 
 - Field dictionary: https://nflreadr.nflverse.com/articles/dictionary_pbp.html
 - Published files: https://github.com/nflverse/nflverse-data/releases/tag/pbp
 
-Before implementing the importer, inspect a real season file, confirm field semantics and identifiers, and review the source's license and attribution requirements. Preserve source attribution in documentation and the interface. Do not imply that upstream data or models were created by this project.
+The initial season and fields were inspected in PR #1; findings, hash, and attribution are recorded in `docs/SOURCE_INSPECTION.md`. Preserve source attribution in documentation and the interface. Do not imply that upstream data or models were created by this project.
 
 ## Data contract and metric rules
 
-This is the next design task. Finalize these rules before implementing aggregates.
+Version 1 rules are defined in [the data contract](docs/DATA_CONTRACT.md) and exercised by PostgreSQL summary fixtures. Future changes require explicit documentation and compatibility review.
 
 ### Record identity and retained fields
 
-- Confirm a stable play identifier from the source, likely a combination of game and play identifiers; verify uniqueness before adopting it.
+- Use `(game_id, play_id)` as the validated initial key; reject duplicate identities on every import.
 - Retain fields needed for identity, season, game context, offense/defense, down, distance, yards gained, descriptions, and metric eligibility.
 - Retain enough source flags to explain exclusions and distinguish relevant play outcomes.
 - Separate legitimate missing values from zero.
@@ -106,15 +125,15 @@ Define and document how the application handles:
 - Missing offense, down, distance, or yardage.
 - Touchdowns, first downs, turnovers, and accepted penalties affecting conversions.
 
-The exact inclusion rules remain open. Each metric must have a named numerator, denominator, and exclusion policy. Use source definitions where appropriate and test those choices explicitly. Do not assume every metric uses the same denominator.
+Version 1 includes qualifying run/pass records, including sacks, scrambles, and qualifying penalty records; it excludes no-play records, kneels, spikes, special teams, two-point attempts, deleted records, and aborted plays. The data contract defines metric-specific denominators, identified targets, null handling, and classified conversions.
 
 ### Initial metrics
 
 | Metric | Required definition |
 | --- | --- |
 | Play count | Count of records qualifying under the documented population and filters |
-| Yards per play | Yardage sum divided by the explicitly defined eligible count; decide missing-yardage behavior |
-| Third/fourth-down conversion rate | Successful conversions divided by eligible attempts; settle penalty and touchdown handling |
+| Yards per play | Sum of non-null yardage divided by its valid count; show missing count |
+| Third/fourth-down conversion rate | Converted divided by converted plus failed, using source flags; show unclassified count separately |
 | Average depth of target (aDOT) | Sum of source `air_yards` divided by qualifying targeted pass attempts with non-null air yards; includes incomplete passes and interceptions with recorded air yards, and preserves negative depths |
 | EPA per play | Mean source `epa` across eligible offensive plays with non-null EPA; publish the eligible count |
 | Total EPA | Sum source `epa` over that same EPA population; label as volume-dependent |
@@ -141,13 +160,13 @@ Pass/run frequency is deferred until sacks and scrambles have a deliberate class
 - Handle legitimate nulls explicitly; never silently coerce them to zero.
 - Report malformed data and failure context clearly.
 - Reimporting a season must not create duplicates and must apply source corrections.
-- Decide how records removed from a corrected source file are handled; simple upserts alone may be insufficient.
+- Remove records absent from a corrected source file during transactional season replacement.
 - Publish a season update atomically so failed imports preserve the previous usable dataset.
 - Avoid exposing partially imported data to API requests.
-- Record provenance and import results, including season, source reference, time, row counts, and status. Decide whether a source checksum is useful.
-- Define behavior for concurrent imports of the same season.
+- Record current successful publication provenance, including season, source reference, acquisition/publication time, row counts, contract version, and SHA-256. Report failed attempts to stderr.
+- Serialize concurrent imports of the same season with a transaction-scoped advisory lock.
 
-The choice between staging and transactional season replacement remains open. Select the simplest approach that meets these guarantees.
+Implemented: a single replacement transaction with a season-specific advisory lock. Removed source records are removed on replacement; failure preserves the previous data and metadata. SHA-256 and current successful publication metadata are stored. Downloads remain manual; failures currently go to stderr rather than a durable history table. See [import design](docs/IMPORTING.md).
 
 ## Database and API requirements
 
@@ -164,7 +183,7 @@ The choice between staging and transactional season replacement remains open. Se
 - Keep comparison filters identical except for offensive team.
 - Use the same documented eligibility logic for aggregates and matching plays, exposing any metric-specific differences.
 
-Conceptual API capabilities: list available seasons/teams, retrieve situational summaries, and retrieve matching plays. Exact routes and response shapes will be designed after the data contract. Avoid building a general-purpose query language.
+Implemented: `GET /api/v1/summary` and `GET /healthz`. Current work adds `GET /api/v1/plays`. Season/team discovery and team comparison remain planned. See API documentation for response shapes and timeout values. Avoid building a general-purpose query language.
 
 ## Diagnostics and configuration
 
@@ -246,12 +265,10 @@ Reconsider only when a demonstrated use case warrants the additional work:
 
 ## Open decisions
 
-- Initial season and eventual first-release season coverage.
-- Verified play identity and team-code normalization.
-- Exact metric eligibility and missing-value policies.
-- Query/API schema extensions beyond the implemented atomic season replacement.
-- Future schema changes beyond the first import schema.
-- API routes, response contracts, pagination strategy, and timeout values.
+- Additional first-release seasons beyond 2025 and any historical team-code compatibility changes.
+- Comparison and discovery endpoint contracts.
+- Frontend layout and presentation choices.
+- Query-specific indexes or other optimizations after measurement.
 - Hosting and deployment budget.
 
-Resolve these incrementally, beginning with source inspection and metric definitions. Avoid choosing infrastructure merely to expand the technology list.
+Resolve these incrementally after the matching-play workflow. Avoid choosing infrastructure merely to expand the technology list.
