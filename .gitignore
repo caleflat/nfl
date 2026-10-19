@@ -1,0 +1,7 @@
+/data/raw/*
+!/data/raw/.gitkeep
+/bin/
+/.cache/
+.env
+.DS_Store
+coverage.out
