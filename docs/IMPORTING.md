@@ -2,7 +2,7 @@
 
 ## Scope
 
-This milestone implements local-file ingestion for the contract version 1 regular-season dataset. It does not implement automatic downloads, HTTP endpoints, or aggregate metrics. PostgreSQL 18 runs through Compose locally and as a CI service.
+This document covers local-file ingestion for the contract version 1 regular-season dataset. It does not implement automatic downloads. PostgreSQL 18, the migration command, and the API now run through Compose locally; see the [README](../README.md#run-with-docker-compose) for the default workflow and [API documentation](API.md) for query behavior. The optional `importer` service runs on demand with `docker compose run --rm importer ...` and reads from the host `data/raw` directory mounted read-only at `/data`.
 
 ## Schema decisions
 

@@ -26,7 +26,7 @@ The interface will show sample sizes alongside results and explain which records
 | Database access | Explicit SQL through `database/sql` and pgx's compatibility driver | Keep queries visible and explainable |
 | Schema changes | Embedded, numbered SQL migrations with checksums and a transactional runner | Reproducible database setup and evolution |
 | Frontend | React, TypeScript, Vite | A focused interactive client for the Go API |
-| Local database | Docker Compose | Reproducible local PostgreSQL setup |
+| Local services | Docker Compose | Start PostgreSQL, apply migrations, and run the API together; run imports explicitly |
 | CI | GitHub Actions | Run meaningful tests and build checks |
 
 Use one repository, one database, and one API process. Provide separate `import` and `serve` commands, sharing code where appropriate. The exact command syntax and package layout remain implementation decisions.

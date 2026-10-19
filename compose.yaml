@@ -1,3 +1,9 @@
+x-app: &app
+  image: nfl-dev:local
+  build: .
+  environment:
+    DATABASE_URL: postgres://nfl:local_nfl@db:5432/nfl?sslmode=disable
+
 services:
   db:
     image: postgres:18
@@ -14,6 +20,44 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  migrate:
+    <<: *app
+    command: ["/app/migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  importer:
+    <<: *app
+    profiles: ["tools"]
+    entrypoint: ["/app/import"]
+    command: []
+    volumes:
+      - ./data/raw:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

@@ -2,17 +2,23 @@
 
 Status: first endpoint, prepared for review. The matching-play list, team comparison, and metadata discovery endpoints are later milestones. Run migrations and import a season before querying it.
 
-## Run locally
+## Run with Docker Compose
 
-Load `DATABASE_URL` as described in the README, then:
+Start Docker/OrbStack, then run from the repository root:
 
 ```sh
-go run ./cmd/serve
+docker compose up -d --build --wait
 curl -sS 'http://127.0.0.1:8080/healthz'
 curl -sS 'http://127.0.0.1:8080/api/v1/summary?season=2025&team=NE&down=3&min_distance=5&max_distance=10'
 ```
 
-The server listens on `127.0.0.1:8080` by default; `-addr` changes it. `-query-timeout` defaults to `5s` and must be positive and at most `15s`. The server checks database connectivity at startup; it does not migrate or import automatically. Request logs are JSON on stderr with method, path, status, and duration. Query errors are logged internally; SQL details are not returned to clients.
+Compose waits for PostgreSQL's health check, runs the migration command successfully, then starts the API and waits for its health check. No shell export of `DATABASE_URL` is needed: containers connect to `db:5432`. The existing named database volume is reused. A fresh database still needs a [season import](../README.md#run-with-docker-compose); without it, the summary returns `season_unavailable`.
+
+The host API port defaults to 8080; set `API_PORT` in `.env` to change it. PostgreSQL's host port defaults to 5433 via `POSTGRES_PORT`. App containers use their explicit internal database URL. Source changes require rerunning `docker compose up -d --build --wait`; there is no automatic reload.
+
+Use `docker compose logs -f api` for logs, `docker compose ps -a` for service state, and `docker compose stop` to stop services while retaining data. The migration container exiting with code 0 is expected. A migration failure prevents API startup; inspect `docker compose logs migrate`.
+
+For host Go development, follow the separate [README instructions](../README.md#host-go-development). The Go server itself checks database connectivity but does not migrate or import automatically. It listens on `127.0.0.1:8080` by default; `-addr` changes it. `-query-timeout` defaults to `5s` and must be positive and at most `15s`. Request logs are JSON on stderr with method, path, status, and duration. SQL error details are not returned to clients. The root URL `/` has no UI and returns a JSON 404; use the routes shown here.
 
 ## GET /api/v1/summary
 

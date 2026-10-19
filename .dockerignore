@@ -1,0 +1,11 @@
+.git
+.github
+.cache
+.env
+.env.*
+bin
+data
+docs
+*.md
+coverage.out
+.DS_Store
