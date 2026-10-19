@@ -1,6 +1,6 @@
 # NFL Situational Play Explorer
 
-Status: planning; implementation has not started.
+Status: source inspection and proposed data contract are prepared for review. See [source findings](docs/SOURCE_INSPECTION.md) and [data contract](docs/DATA_CONTRACT.md). Database imports, API, and frontend are not implemented yet.
 
 ## Purpose
 
@@ -62,6 +62,7 @@ Imports run independently of user requests. A search must never download source 
 - Average yards gained per qualifying play.
 - Average depth of target (aDOT), with the number of qualifying throws.
 - EPA per play and total EPA, with the number of plays containing usable EPA.
+- EPA-based success rate and source CPOE, with metric-specific counts and coverage rules defined in the data contract.
 - Conversion rate for third- or fourth-down selections, with the qualifying denominator shown.
 - Paginated matching plays with descriptions, teams, and game context.
 - Side-by-side team results under identical filters.
