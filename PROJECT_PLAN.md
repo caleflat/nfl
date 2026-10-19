@@ -1,6 +1,6 @@
 # NFL Situational Play Explorer
 
-Status: source inspection and proposed data contract are prepared for review. See [source findings](docs/SOURCE_INSPECTION.md) and [data contract](docs/DATA_CONTRACT.md). Database imports, API, and frontend are not implemented yet.
+Status: source inspection and the initial data contract are merged. PostgreSQL migrations and atomic local-file imports are implemented on a feature branch for review; see [import design](docs/IMPORTING.md). API, aggregate metric queries, and frontend are not implemented yet.
 
 ## Purpose
 
@@ -23,8 +23,8 @@ The interface will show sample sizes alongside results and explain which records
 | API and importer | Go | Practice backend development in Go; share types and database logic |
 | HTTP server | Standard library `net/http` | Sufficient for the planned JSON API |
 | Database | PostgreSQL | Fits filtered queries, aggregates, constraints, and transactions |
-| Database access | Explicit SQL through `database/sql` with a PostgreSQL driver | Keep queries visible and explainable; driver selection remains open |
-| Schema changes | Versioned SQL migrations | Reproducible database setup and evolution; migration tool remains open |
+| Database access | Explicit SQL through `database/sql` and pgx's compatibility driver | Keep queries visible and explainable |
+| Schema changes | Embedded, numbered SQL migrations with checksums and a transactional runner | Reproducible database setup and evolution |
 | Frontend | React, TypeScript, Vite | A focused interactive client for the Go API |
 | Local database | Docker Compose | Reproducible local PostgreSQL setup |
 | CI | GitHub Actions | Run meaningful tests and build checks |
@@ -249,8 +249,8 @@ Reconsider only when a demonstrated use case warrants the additional work:
 - Initial season and eventual first-release season coverage.
 - Verified play identity and team-code normalization.
 - Exact metric eligibility and missing-value policies.
-- Database schema and atomic reimport strategy.
-- PostgreSQL driver and migration tooling.
+- Query/API schema extensions beyond the implemented atomic season replacement.
+- Future schema changes beyond the first import schema.
 - API routes, response contracts, pagination strategy, and timeout values.
 - Hosting and deployment budget.
 

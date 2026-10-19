@@ -13,6 +13,8 @@ import (
 	"math"
 	"os"
 	"strconv"
+
+	"github.com/caleflat/nfl/internal/pbp"
 )
 
 var required = []string{
@@ -83,7 +85,7 @@ func run(path string, out io.Writer) error {
 }
 
 func missing(value string) bool {
-	return value == "" || value == "NA" || value == "NaN"
+	return pbp.Missing(value)
 }
 
 func inspect(input io.Reader) (report, error) {
@@ -196,11 +198,5 @@ func inspect(input io.Reader) (report, error) {
 // This is a proposed analytical population, not an upstream NFL definition.
 // Keep it synchronized with docs/DATA_CONTRACT.md while the contract is reviewed.
 func eligible(get func(string) string) bool {
-	down := get("down")
-	return get("season_type") == "REG" &&
-		(get("play_type") == "pass" || get("play_type") == "run") &&
-		!missing(get("posteam")) &&
-		(down == "1" || down == "2" || down == "3" || down == "4") &&
-		get("qb_kneel") == "0" && get("qb_spike") == "0" &&
-		get("two_point_attempt") == "0" && get("play_deleted") == "0" && get("aborted_play") == "0"
+	return pbp.Eligible(get)
 }

@@ -1,6 +1,6 @@
 # Proposed data contract — version 1
 
-Status: proposed for review in the first PR. These rules describe application behavior, not official league statistics. The inspection command profiles the proposed population; import, SQL aggregates, and API behavior will be implemented in later PRs.
+Status: initial rules merged in the first PR. These rules describe application behavior, not official league statistics. Inspection and import share the population policy. SQL aggregate metrics and API behavior remain future work. See [import implementation](IMPORTING.md) for schema and validation details.
 
 ## Coverage and identity
 
@@ -56,9 +56,9 @@ The snapshot has eight eligible third-down records with neither flag set. Exclud
 
 EPA and CPOE use upstream model outputs, not models trained by this project. They are descriptive, model-dependent, and not opponent-adjusted or causal estimates of individual ability. This release summarizes offenses, not individual quarterback rankings. Averages across multiple groups must be computed from underlying sums/counts, not unweighted averages of averages.
 
-## Proposed retained fields
+## Retained fields
 
-Finalize column types during the schema PR. Retain these source fields or explicit equivalents:
+The initial schema retains these source fields or explicit equivalents:
 
 - Identity/provenance: `game_id`, `play_id`, `season`, `season_type`, and a reference to the successful import.
 - Context: `week`, `game_date`, `home_team`, `away_team`, `posteam`, `defteam`, `drive`, `qtr`, `time`, `down`, `ydstogo`, `yardline_100`, `score_differential`, `game_seconds_remaining`, `desc`.
