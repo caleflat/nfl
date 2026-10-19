@@ -1,6 +1,6 @@
 # NFL Situational Play Explorer
 
-Status: source inspection and the initial data contract are merged. PostgreSQL migrations and atomic local-file imports are implemented on a feature branch for review; see [import design](docs/IMPORTING.md). API, aggregate metric queries, and frontend are not implemented yet.
+Status: source inspection, the initial data contract, PostgreSQL migrations, and atomic local-file imports are merged. Verified summary metrics and their first HTTP endpoint are implemented on a feature branch for review; see [API documentation](docs/API.md). Matching-play pagination, comparison, and frontend remain future work.
 
 ## Purpose
 

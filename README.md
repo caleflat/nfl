@@ -2,7 +2,7 @@
 
 A Go/PostgreSQL project for exploring how NFL offenses perform in selected game situations. The backend is the primary focus; a small React interface is planned.
 
-**Current state:** source inspection, PostgreSQL schema/migrations, and a local CSV importer. There is no API or frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), and [database/import design](docs/IMPORTING.md).
+**Current state:** source inspection, PostgreSQL schema/migrations, a local CSV importer, and the first situational summary endpoint. There is no frontend yet. See [the project plan](PROJECT_PLAN.md), [data contract](docs/DATA_CONTRACT.md), [source findings](docs/SOURCE_INSPECTION.md), [database/import design](docs/IMPORTING.md), and [API documentation](docs/API.md).
 
 ## Run the source inspection
 
@@ -27,7 +27,7 @@ The inspection command streams the CSV and outputs JSON containing its SHA-256, 
 - Review and merge each milestone before starting work that depends on it.
 - Do not commit downloaded datasets, local configuration secrets, or generated binaries.
 
-The first PR established source findings and metric rules. The second adds database setup and atomic imports. API and aggregate calculations follow separately.
+The first PR established source findings and metric rules. The second added database setup and atomic imports. The third adds verified summary calculations and their first HTTP endpoint. Play listings, team comparison, and frontend work follow separately.
 
 ## Start PostgreSQL and import a season
 
@@ -56,6 +56,22 @@ docker compose exec -T db psql -U nfl -d nfl -c \
 ```
 
 Stop the database with `docker compose stop`; its named volume retains the data.
+
+## Run the API
+
+With `DATABASE_URL` loaded and a season imported:
+
+```sh
+go run ./cmd/serve
+```
+
+From another terminal:
+
+```sh
+curl -sS 'http://127.0.0.1:8080/api/v1/summary?season=2025&team=NE&down=3&min_distance=5&max_distance=10'
+```
+
+Results include play count, yards/play, EPA, success rate, aDOT, CPOE, classified-attempt conversion rate, metric-specific coverage, and source provenance. See [API documentation](docs/API.md) for response semantics, configuration, and error behavior.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 # Proposed data contract — version 1
 
-Status: initial rules merged in the first PR. These rules describe application behavior, not official league statistics. Inspection and import share the population policy. SQL aggregate metrics and API behavior remain future work. See [import implementation](IMPORTING.md) for schema and validation details.
+Status: initial rules merged in the first PR. These rules describe application behavior, not official league statistics. Inspection and import share the population policy. SQL aggregate metrics and the first summary endpoint are implemented for review; see [API documentation](API.md). See [import implementation](IMPORTING.md) for schema and validation details.
 
 ## Coverage and identity
 
@@ -36,7 +36,7 @@ All metrics start from the filtered base population but use their own valid obse
 | CPOE | Mean of non-null source `cpoe` on the targeted-attempt subset | Display in percentage points; do not multiply upstream values by 100 |
 | Third-/fourth-down conversion | Converted / (converted + failed), for the chosen down | Use the corresponding source conversion flags; show unclassified count separately |
 
-Success rate and CPOE extend the initial metric set discussed in the project plan. Their SQL calculations and hand-checked fixtures are part of the later metric implementation, not completed by this inspection PR.
+Success rate and CPOE extend the initial metric set discussed in the project plan. Their SQL calculations and hand-checked PostgreSQL fixtures are included with the summary endpoint.
 
 ### Targeted-attempt subset
 
